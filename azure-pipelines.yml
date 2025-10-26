@@ -1,0 +1,73 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  javaVersion: '21'
+  imageName: 'connected-vehicle-telemetry-service'
+
+  # ACR_LOGIN_SERVER: myregistry.azurecr.io
+  # DOCKER_REG_SVC_CONN: service-connection-name
+
+stages:
+- stage: BuildAndTest
+  displayName: Build & Test
+  jobs:
+  - job: MavenBuild
+    displayName: Maven Build (verify)
+    steps:
+    - task: JavaToolInstaller@0
+      inputs:
+        versionSpec: '$(javaVersion)'
+        jdkArchitectureOption: 'x64'
+        jdkSourceOption: 'PreInstalled'
+    - task: Maven@4
+      displayName: 'Maven verify (tests on)'
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'verify'
+        options: '-B -ntp'
+        publishJUnitResults: true
+        testResultsFiles: '**/surefire-reports/TEST-*.xml'
+        javaHomeOption: 'Path'
+        jdkDirectory: '$(JAVA_HOME)'
+        mavenVersionOption: 'Default'
+
+- stage: DockerBuildPush
+  displayName: Docker Build & Push
+  dependsOn: BuildAndTest
+  condition: and(succeeded(), ne(variables['ACR_LOGIN_SERVER'], ''))
+  jobs:
+  - job: Docker
+    displayName: Docker build and push to ACR
+    steps:
+    - task: JavaToolInstaller@0
+      inputs:
+        versionSpec: '$(javaVersion)'
+        jdkArchitectureOption: 'x64'
+        jdkSourceOption: 'PreInstalled'
+    - task: Maven@4
+      displayName: 'Maven package (skip tests)'
+      inputs:
+        mavenPomFile: 'pom.xml'
+        goals: 'package'
+        options: '-B -ntp -DskipTests=true'
+        javaHomeOption: 'Path'
+        jdkDirectory: '$(JAVA_HOME)'
+        mavenVersionOption: 'Default'
+    - task: DockerInstaller@0
+      displayName: 'Install Docker client'
+    - task: Docker@2
+      displayName: 'Build & Push'
+      inputs:
+        containerRegistry: '$(DOCKER_REG_SVC_CONN)'
+        repository: '$(imageName)'
+        command: 'buildAndPush'
+        Dockerfile: 'Dockerfile'
+        tags: |
+          $(Build.SourceVersion)
+          latest

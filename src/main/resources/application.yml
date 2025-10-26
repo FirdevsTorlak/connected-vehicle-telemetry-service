@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: telemetry-service
+
+  kafka:
+    # Comma-separated list if you have multiple brokers
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+    consumer:
+      group-id: telemetry-consumer
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+
+server:
+  # Can be overridden by SERVER_PORT
+  port: ${SERVER_PORT:8085}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # List form avoids parsing issues; same as "health,info,metrics"
+        include: [ "health", "info", "metrics" ]
+  endpoint:
+    health:
+      show-details: "when_authorized"
+
+logging:
+  level:
+    # Raise to DEBUG when troubleshooting
+    root: INFO
+    io.example.telemetry: DEBUG
+
+app:
+  kafka:
+    # Toggle Kafka off for fast local dev or tests: APP_KAFKA_ENABLED=false
+    enabled: ${APP_KAFKA_ENABLED:true}
+    # Topic can be changed via APP_KAFKA_TOPIC
+    topic: ${APP_KAFKA_TOPIC:telemetry-events}
